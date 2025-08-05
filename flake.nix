@@ -25,6 +25,8 @@
             pkgs.python313Packages.pip
             pkgs.python313Packages.debugpy
             pkgs.git
+            pkgs.nodejs
+            pkgs.nodePackages.npm
           ];
 
           # Create and activate a virtual environment, then install requirements

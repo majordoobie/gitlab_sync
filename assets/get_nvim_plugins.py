@@ -3,8 +3,8 @@ import subprocess
 from concurrent import futures
 from dataclasses import dataclass
 from pathlib import Path
-from sys import argv
 
+# Fetch all the plugins that are being used in the current repo
 LAZY_REPOS = "~/.local/share/nvim/lazy"
 
 
@@ -36,6 +36,11 @@ def _get_remote_url(repo_path: Path) -> str | None:
 
 
 def _get_repos() -> list[Git]:
+    """
+    Fetch all the repos used currently in my neovim config
+
+    :return:
+    """
     base_dir = Path(LAZY_REPOS).expanduser()
 
     repo_urls = []
@@ -48,19 +53,29 @@ def _get_repos() -> list[Git]:
 
 
 def _clone(url: str, path: Path) -> None:
+    """
+    Worker function for the thread to clone the repo
+
+    :param url: URL to clone
+    :param path: Where to place the repo
+    """
     try:
         subprocess.run(["git", "clone", url, path], check=True)
     except subprocess.CalledProcessError as error:
         print(f"Failed to clone {url}: {error}")
 
 
-def _clone_plugins(target_dir: Path) -> None:
+def get_nvim_plugins(target_dir: Path) -> None:
+    """
+    Iterate over all the URLs and thread the download of each
+    repository to the target path
+
+    :param target_dir: Path to place the cloned repos
+    """
     repo_urls = _get_repos()
     with futures.ThreadPoolExecutor(max_workers=None) as executor:
         future_to_url = {
-            executor.submit(
-                _clone, git.git_url, target_dir / git.name
-            ): git.name
+            executor.submit(_clone, git.git_url, target_dir / git.name): git.name
             for git in repo_urls
         }
 
@@ -72,9 +87,10 @@ def _clone_plugins(target_dir: Path) -> None:
             except Exception as error:
                 print(f"Error with {item} {error}")
 
-def _clone_tree_sitter(target_dir: Path) -> None:
+
+def get_nvim_tree_sitter_langs(target_dir: Path) -> None:
     with open("parsers.json") as file:
-        parsers: dict = json.load(file)
+        parsers = json.load(file)
 
     trees: list[TreeSitter] = []
     for k, v in parsers.items():
@@ -95,22 +111,11 @@ def _clone_tree_sitter(target_dir: Path) -> None:
         }
 
         # Collect the results as they complete
+
         for future in futures.as_completed(future_to_url):
             item = future_to_url[future]
             try:
                 future.result()
+
             except Exception as error:
                 print(f"Error with {item} {error}")
-
-
-def main(target_dir: Path) -> None:
-    _clone_plugins(target_dir)
-    # _clone_tree_sitter(target_dir)
-
-
-if __name__ == "__main__":
-    if len(argv) != 2 or not Path(argv[1]).is_dir():
-        exit(
-            "Provide the path to the target directory where the repos will be cloned to"
-        )
-    main(Path(argv[1]))
