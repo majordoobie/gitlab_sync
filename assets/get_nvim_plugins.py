@@ -60,7 +60,11 @@ def _clone(url: str, path: Path) -> None:
     :param path: Where to place the repo
     """
     try:
-        subprocess.run(["git", "clone", url, path], check=True)
+        subprocess.run(
+            ["git", "clone", "--depth=1", url, path], 
+            check=True,
+            capture_output=True  # Suppress git output for cleaner logs
+        )
     except subprocess.CalledProcessError as error:
         print(f"Failed to clone {url}: {error}")
 
@@ -73,7 +77,7 @@ def get_nvim_plugins(target_dir: Path) -> None:
     :param target_dir: Path to place the cloned repos
     """
     repo_urls = _get_repos()
-    with futures.ThreadPoolExecutor(max_workers=None) as executor:
+    with futures.ThreadPoolExecutor(max_workers=20) as executor:
         future_to_url = {
             executor.submit(_clone, git.git_url, target_dir / git.name): git.name
             for git in repo_urls
@@ -89,7 +93,11 @@ def get_nvim_plugins(target_dir: Path) -> None:
 
 
 def get_nvim_tree_sitter_langs(target_dir: Path) -> None:
-    with open("parsers.json") as file:
+    # Get the path to parsers.json in the assets folder
+    script_dir = Path(__file__).parent
+    parsers_file = script_dir / "parsers.json"
+    
+    with parsers_file.open() as file:
         parsers = json.load(file)
 
     trees: list[TreeSitter] = []
@@ -102,10 +110,10 @@ def get_nvim_tree_sitter_langs(target_dir: Path) -> None:
             )
         )
 
-    with futures.ThreadPoolExecutor(max_workers=None) as executor:
+    with futures.ThreadPoolExecutor(max_workers=20) as executor:
         future_to_url = {
             executor.submit(
-                _clone, tree.git_url, target_dir / "tree_objs" / tree.name
+                _clone, tree.git_url, target_dir / tree.name
             ): tree.name
             for tree in trees
         }

@@ -1,5 +1,6 @@
 import json
 import subprocess
+from concurrent import futures
 from pathlib import Path
 
 NPMS = [
@@ -50,29 +51,60 @@ BINARIES = [
         "repo": "tamasfe/taplo",
         "filename_template": "taplo-linux-x86_64.gz",
     },
+    {
+        "name": "Zen",
+        "repo": "zen-browser/desktop",
+        "filename_template": "zen.installer.exe",
+    },
+    {
+        "name": "Wezterm",
+        "repo": "wezterm/wezterm",
+        "filename_template": "WezTerm-{version}-setup.exe"
+    },
+    {
+        "name": "komorebi",
+        "repo": "LGUG2Z/komorebi",
+        "filename_template": "komorebi-{version}-x86_64.msi"
+    }
 ]
 
+def _npm_pack_single(npm_pkg: dict, destination: Path) -> None:
+    """Download a single npm package"""
+    try:
+        subprocess.run(
+            [
+                "npm",
+                "pack",
+                npm_pkg.get("npm_loc", ""),
+                "--pack-destination",
+                destination.as_posix(),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        print(f"Downloaded npm package: {npm_pkg['name']} ({npm_pkg.get('npm_loc', '')})")
+    except subprocess.CalledProcessError as error:
+        print(f"Command failed for {npm_pkg['name']}: {error.cmd}")
+        print(f"Return code: {error.returncode}")
+        print(f"Stdout: {error.stdout}")
+        print(f"Stderr: {error.stderr}")
+
+
 def _get_npm_lsps(destination: Path) -> None:
-    for npm_pkg in NPMS:
-        try:
-            subprocess.run(
-                [
-                    "npm",
-                    "pack",
-                    npm_pkg.get("npm_loc", ""),
-                    "--pack-destination",
-                    destination.as_posix(),
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            print(f"Downloaded npm package: {npm_pkg['name']} ({npm_pkg.get('npm_loc', '')})")
-        except subprocess.CalledProcessError as error:
-            print(f"Command failed for {npm_pkg['name']}: {error.cmd}")
-            print(f"Return code: {error.returncode}")
-            print(f"Stdout: {error.stdout}")
-            print(f"Stderr: {error.stderr}")
+    """Download all npm packages concurrently"""
+    with futures.ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_npm = {
+            executor.submit(_npm_pack_single, npm_pkg, destination): npm_pkg["name"]
+            for npm_pkg in NPMS
+        }
+        
+        for future in futures.as_completed(future_to_npm):
+            npm_name = future_to_npm[future]
+            try:
+                future.result()
+            except Exception as error:
+                print(f"Error downloading npm package {npm_name}: {error}")
 
 
 def _get_latest_binary(binary_info: dict[str, str], destination: Path) -> None:
@@ -91,7 +123,10 @@ def _get_latest_binary(binary_info: dict[str, str], destination: Path) -> None:
         )
 
         release_data = json.loads(result.stdout)
-        latest_version = release_data["tag_name"]
+        try:
+            latest_version = release_data["tag_name"]
+        except:
+            exit(f"Could not get tag name for {binary_info} -- {release_data}")
 
         # Construct filename based on template
         if "{version}" in binary_info["filename_template"]:
@@ -126,9 +161,19 @@ def _get_latest_binary(binary_info: dict[str, str], destination: Path) -> None:
 
 
 def _get_binaries(destination: Path) -> None:
-    """Download all binary releases"""
-    for binary in BINARIES:
-        _get_latest_binary(binary, destination)
+    """Download all binary releases concurrently"""
+    with futures.ThreadPoolExecutor(max_workers=15) as executor:
+        future_to_binary = {
+            executor.submit(_get_latest_binary, binary, destination): binary["name"]
+            for binary in BINARIES
+        }
+        
+        for future in futures.as_completed(future_to_binary):
+            binary_name = future_to_binary[future]
+            try:
+                future.result()
+            except Exception as error:
+                print(f"Error downloading binary {binary_name}: {error}")
 
 
 def get_lsps(destination: Path) -> None:

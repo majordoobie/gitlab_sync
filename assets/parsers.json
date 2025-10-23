@@ -1141,13 +1141,6 @@
     },
     "maintainers": ["@connorlay"]
   },
-  "ipkg": {
-    "install_info": {
-      "files": ["src/parser.c", "src/scanner.c"],
-      "url": "https://github.com/srghma/tree-sitter-ipkg"
-    },
-    "maintainers": ["@srghma"]
-  },
   "diff": {
     "install_info": {
       "files": ["src/parser.c"],

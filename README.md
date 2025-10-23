@@ -1,7 +1,7 @@
 # gitlab_sync
 
 ```bash
-nix develop -c zsh
+nix develop -c fish
 python3 gitlab_repos.py target_dir
 ```
 
