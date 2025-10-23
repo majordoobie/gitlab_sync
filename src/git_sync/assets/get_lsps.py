@@ -70,6 +70,7 @@ BINARIES = [
 
 def _npm_pack_single(npm_pkg: dict, destination: Path) -> None:
     """Download a single npm package"""
+    print(f"  📦 Downloading npm package: {npm_pkg['name']} ({npm_pkg.get('npm_loc', '')})...")
     try:
         subprocess.run(
             [
@@ -83,32 +84,38 @@ def _npm_pack_single(npm_pkg: dict, destination: Path) -> None:
             text=True,
             check=True,
         )
-        print(f"Downloaded npm package: {npm_pkg['name']} ({npm_pkg.get('npm_loc', '')})")
+        print(f"  ✓ Downloaded: {npm_pkg['name']}")
     except subprocess.CalledProcessError as error:
-        print(f"Command failed for {npm_pkg['name']}: {error.cmd}")
-        print(f"Return code: {error.returncode}")
-        print(f"Stdout: {error.stdout}")
-        print(f"Stderr: {error.stderr}")
+        print(f"  ✗ Failed: {npm_pkg['name']}")
+        print(f"    Error: {error.stderr}")
 
 
 def _get_npm_lsps(destination: Path) -> None:
     """Download all npm packages concurrently"""
+    print(f"\n📦 Downloading NPM Language Servers ({len(NPMS)} packages)...")
+    print("=" * 60)
+
     with futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_to_npm = {
             executor.submit(_npm_pack_single, npm_pkg, destination): npm_pkg["name"]
             for npm_pkg in NPMS
         }
-        
+
+        completed = 0
         for future in futures.as_completed(future_to_npm):
             npm_name = future_to_npm[future]
+            completed += 1
             try:
                 future.result()
+                print(f"  Progress: {completed}/{len(NPMS)}")
             except Exception as error:
-                print(f"Error downloading npm package {npm_name}: {error}")
+                print(f"  ✗ Error downloading npm package {npm_name}: {error}")
+                print(f"  Progress: {completed}/{len(NPMS)}")
 
 
 def _get_latest_binary(binary_info: dict[str, str], destination: Path) -> None:
     """Download the latest binary release for a given repo"""
+    print(f"  📥 Downloading binary: {binary_info['name']} from {binary_info['repo']}...")
     try:
         # Get latest release info from GitHub API
         result = subprocess.run(
@@ -149,31 +156,36 @@ def _get_latest_binary(binary_info: dict[str, str], destination: Path) -> None:
             check=True,
         )
 
-        print(f"Downloaded {binary_info['name']} {latest_version}: {filename}")
+        print(f"  ✓ Downloaded: {binary_info['name']} {latest_version}")
 
     except subprocess.CalledProcessError as error:
-        print(f"Command failed for {binary_info['name']}: {error.cmd}")
-        print(f"Return code: {error.returncode}")
-        print(f"Stdout: {error.stdout}")
-        print(f"Stderr: {error.stderr}")
+        print(f"  ✗ Failed: {binary_info['name']}")
+        print(f"    Error: {error.stderr}")
     except json.JSONDecodeError as error:
-        print(f"Failed to parse GitHub API response for {binary_info['name']}: {error}")
+        print(f"  ✗ Failed to parse GitHub API response for {binary_info['name']}: {error}")
 
 
 def _get_binaries(destination: Path) -> None:
     """Download all binary releases concurrently"""
+    print(f"\n📥 Downloading Binary Releases ({len(BINARIES)} binaries)...")
+    print("=" * 60)
+
     with futures.ThreadPoolExecutor(max_workers=15) as executor:
         future_to_binary = {
             executor.submit(_get_latest_binary, binary, destination): binary["name"]
             for binary in BINARIES
         }
-        
+
+        completed = 0
         for future in futures.as_completed(future_to_binary):
             binary_name = future_to_binary[future]
+            completed += 1
             try:
                 future.result()
+                print(f"  Progress: {completed}/{len(BINARIES)}")
             except Exception as error:
-                print(f"Error downloading binary {binary_name}: {error}")
+                print(f"  ✗ Error downloading binary {binary_name}: {error}")
+                print(f"  Progress: {completed}/{len(BINARIES)}")
 
 
 def get_lsps(destination: Path) -> None:

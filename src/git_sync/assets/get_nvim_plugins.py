@@ -52,21 +52,24 @@ def _get_repos() -> list[Git]:
     return repo_urls
 
 
-def _clone(url: str, path: Path) -> None:
+def _clone(url: str, path: Path, name: str) -> None:
     """
     Worker function for the thread to clone the repo
 
     :param url: URL to clone
     :param path: Where to place the repo
+    :param name: Name of the repo for logging
     """
+    print(f"  🔄 Cloning: {name}...")
     try:
         subprocess.run(
-            ["git", "clone", "--depth=1", url, path], 
+            ["git", "clone", "--depth=1", url, path],
             check=True,
-            capture_output=True  # Suppress git output for cleaner logs
+            capture_output=True,  # Suppress git output for cleaner logs
         )
+        print(f"  ✓ Cloned: {name}")
     except subprocess.CalledProcessError as error:
-        print(f"Failed to clone {url}: {error}")
+        print(f"  ✗ Failed to clone {name}: {error}")
 
 
 def get_nvim_plugins(target_dir: Path) -> None:
@@ -77,26 +80,32 @@ def get_nvim_plugins(target_dir: Path) -> None:
     :param target_dir: Path to place the cloned repos
     """
     repo_urls = _get_repos()
+    print(f"\n🔌 Cloning Neovim Plugins ({len(repo_urls)} repositories)...")
+    print("=" * 60)
+
     with futures.ThreadPoolExecutor(max_workers=20) as executor:
         future_to_url = {
-            executor.submit(_clone, git.git_url, target_dir / git.name): git.name
-            for git in repo_urls
+            executor.submit(_clone, git.git_url, target_dir / git.name, git.name): git.name for git in repo_urls
         }
 
+        completed = 0
         # Collect the results as they complete
         for future in futures.as_completed(future_to_url):
             item = future_to_url[future]
+            completed += 1
             try:
                 future.result()
+                print(f"  Progress: {completed}/{len(repo_urls)}")
             except Exception as error:
-                print(f"Error with {item} {error}")
+                print(f"  ✗ Error with {item}: {error}")
+                print(f"  Progress: {completed}/{len(repo_urls)}")
 
 
 def get_nvim_tree_sitter_langs(target_dir: Path) -> None:
     # Get the path to parsers.json in the assets folder
     script_dir = Path(__file__).parent
     parsers_file = script_dir / "parsers.json"
-    
+
     with parsers_file.open() as file:
         parsers = json.load(file)
 
@@ -110,20 +119,22 @@ def get_nvim_tree_sitter_langs(target_dir: Path) -> None:
             )
         )
 
+    print(f"\n🌳 Cloning Tree-sitter Parsers ({len(trees)} parsers)...")
+    print("=" * 60)
+
     with futures.ThreadPoolExecutor(max_workers=20) as executor:
         future_to_url = {
-            executor.submit(
-                _clone, tree.git_url, target_dir / tree.name
-            ): tree.name
-            for tree in trees
+            executor.submit(_clone, tree.git_url, target_dir / tree.name, tree.name): tree.name for tree in trees
         }
 
+        completed = 0
         # Collect the results as they complete
-
         for future in futures.as_completed(future_to_url):
             item = future_to_url[future]
+            completed += 1
             try:
                 future.result()
-
+                print(f"  Progress: {completed}/{len(trees)}")
             except Exception as error:
-                print(f"Error with {item} {error}")
+                print(f"  ✗ Error with {item}: {error}")
+                print(f"  Progress: {completed}/{len(trees)}")

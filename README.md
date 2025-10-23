@@ -2,7 +2,7 @@
 
 ```bash
 nix develop -c fish
-python3 gitlab_repos.py target_dir
+uv run git-sync -d /tmp
 ```
 
 
@@ -52,7 +52,7 @@ Installing them requires using NPM on the target machine
 
 ## Binary
 - [x] [lazygit](https://github.com/jesseduffield/lazygit/releases)
-- [x] [nvim](https://github.com/neovim/neovim/releases) 
+- [x] [nvim](https://github.com/neovim/neovim/releases)
 - [x] [lua-language-server](https://github.com/LuaLS/lua-language-server/releases)
 - [x] [starship](https://github.com/starship/starship/releases)
 - [x] [stylua](https://github.com/JohnnyMorganz/StyLua/releases)

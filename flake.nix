@@ -1,5 +1,5 @@
 {
-  description = "Nix flake for a Python development environment using pip and venv";
+  description = "Nix flake for a Python development environment using uv";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -19,30 +19,15 @@
       in
       {
         devShell = pkgs.mkShell {
-          # Include Python and pip in the environment
           packages = [
+            pkgs.uv
             pkgs.python313
-            pkgs.python313Packages.pip
-            pkgs.python313Packages.debugpy
             pkgs.git
             pkgs.nodejs
             pkgs.nodePackages.npm
           ];
 
-          # Create and activate a virtual environment, then install requirements
           shellHook = ''
-            if [ ! -d .venv ]; then
-              echo "Creating virtual environment..."
-              python -m venv .venv
-            fi
-            source .venv/bin/activate
-            pip install --upgrade pip
-            if [ -f requirements.txt ]; then
-              echo "Installing Python dependencies from requirements.txt..."
-              pip install -r requirements.txt
-            else
-              echo "No requirements.txt found."
-            fi
           '';
         };
       }
