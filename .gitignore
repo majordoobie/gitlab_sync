@@ -1,6 +1,9 @@
 # Output directories
 bin_output/
 output_dir/
+.DS_Store
+CLAUDE.md
+.venv
 
 # Python virtual environments
 .venv/
@@ -31,4 +34,3 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-

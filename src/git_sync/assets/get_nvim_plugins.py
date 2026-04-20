@@ -4,8 +4,47 @@ from concurrent import futures
 from dataclasses import dataclass
 from pathlib import Path
 
-# Fetch all the plugins that are being used in the current repo
-LAZY_REPOS = "~/.local/share/nvim/lazy"
+# Fetch all the plugins that are being used in the current repo.
+# Neovim config uses vim.pack (Neovim 0.12 built-in), which installs plugins here:
+PACK_REPOS = "~/.local/share/nvim/site/pack/core/opt"
+
+# Curated "brief" subset of tree-sitter parsers for minimal installs.
+# Covers everyday dev languages + the injection/doc parsers that Neovim
+# highlighting quietly depends on (comment, regex, markdown_inline, vimdoc).
+BRIEF_PARSERS: frozenset[str] = frozenset({
+    "asm",
+    "bash",
+    "c",
+    "cmake",
+    "comment",
+    "cpp",
+    "css",
+    "diff",
+    "dockerfile",
+    "gitcommit",
+    "go",
+    "html",
+    "java",
+    "javascript",
+    "json",
+    "json5",
+    "llvm",
+    "lua",
+    "make",
+    "markdown",
+    "markdown_inline",
+    "objdump",
+    "python",
+    "query",
+    "regex",
+    "rust",
+    "sql",
+    "toml",
+    "tsx",
+    "typescript",
+    "vimdoc",
+    "yaml",
+})
 
 
 @dataclass
@@ -41,7 +80,7 @@ def _get_repos() -> list[Git]:
 
     :return:
     """
-    base_dir = Path(LAZY_REPOS).expanduser()
+    base_dir = Path(PACK_REPOS).expanduser()
 
     repo_urls = []
     for repo in base_dir.iterdir():
@@ -63,9 +102,9 @@ def _clone(url: str, path: Path, name: str) -> None:
     print(f"  🔄 Cloning: {name}...")
     try:
         subprocess.run(
-            ["git", "clone", "--depth=1", url, path],
+            ["git", "clone", "--mirror", url, path],
             check=True,
-            capture_output=True,  # Suppress git output for cleaner logs
+            capture_output=True,
         )
         print(f"  ✓ Cloned: {name}")
     except subprocess.CalledProcessError as error:
@@ -101,13 +140,19 @@ def get_nvim_plugins(target_dir: Path) -> None:
                 print(f"  Progress: {completed}/{len(repo_urls)}")
 
 
-def get_nvim_tree_sitter_langs(target_dir: Path) -> None:
+def get_nvim_tree_sitter_langs(target_dir: Path, brief: bool = False) -> None:
     # Get the path to parsers.json in the assets folder
     script_dir = Path(__file__).parent
     parsers_file = script_dir / "parsers.json"
 
     with parsers_file.open() as file:
         parsers = json.load(file)
+
+    if brief:
+        missing = BRIEF_PARSERS - parsers.keys()
+        if missing:
+            print(f"  ⚠️  Brief parsers not found in parsers.json: {sorted(missing)}")
+        parsers = {k: v for k, v in parsers.items() if k in BRIEF_PARSERS}
 
     trees: list[TreeSitter] = []
     for k, v in parsers.items():
@@ -119,7 +164,8 @@ def get_nvim_tree_sitter_langs(target_dir: Path) -> None:
             )
         )
 
-    print(f"\n🌳 Cloning Tree-sitter Parsers ({len(trees)} parsers)...")
+    label = "brief" if brief else "full"
+    print(f"\n🌳 Cloning Tree-sitter Parsers ({len(trees)} parsers, {label})...")
     print("=" * 60)
 
     with futures.ThreadPoolExecutor(max_workers=20) as executor:
